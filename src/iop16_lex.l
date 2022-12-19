@@ -4,14 +4,24 @@
 #include <stdlib.h>
 #include "iop16_parser.tab.h"
 #include "iop16_state.h"
+#include "die.h"
 
-static void comment();
+static void comment_multiline();
+static void comment_single();
 static void c();
+static YYSTYPE conv_integer();
 %}
+
 
 ws	[ \t\n]
 reg	[\$rR]
 digit	[0-9]
+
+int10   [1-9][0-9]*
+int2    0b[0-1]+
+int8    0[0-7]+
+int16   0x[0-9a-fA-F]+
+
 hdigit  [0-9a-fA-F]
 anum    [a-zA-Z][a-zA-Z0-9_]*
 A	[aA]
@@ -42,15 +52,32 @@ Y	[yY]
 Z	[zZ]
 
 %%
-"/*"		{ comment(); }
+"/*"		{ comment_multiline(); }
+"//"            { comment_single();    }
+"#"             { comment_single();    }
+";;"            { comment_single();    }
+"!"             { comment_single();    }
 {ws}+		;
 ","		{ c(); return T_COMMA; }
-{reg}{hdigit}+  { c(); state.reg = strtol(yytext + 1, NULL, 16); return(T_REG); }
+{reg}{hdigit}   { c(); state.reg = strtol(yytext + 1, NULL, 16); return(T_REG); }
 "("             { c(); return(T_LPAREN); }
 ")"             { c(); return(T_RPAREN); }
-"#"             { c(); return(T_SHARP); }
 ":"		{ c(); return(T_COLON); }
-{hdigit}+       { c(); state.imm = strtol(yytext, NULL, 16); return(T_IMM); }
+
+[1-9][0-9]*     { c(); yylval = conv_integer(yytext    , 10); return(T_NUMBER);}
+0b[0-1]+        { c(); yylval = conv_integer(yytext + 2,  2); return(T_NUMBER);}
+0[0-7]+         { c(); yylval = conv_integer(yytext + 1,  8); return(T_NUMBER);}
+0x[0-9a-fA-F]+  { c(); yylval = conv_integer(yytext + 2, 16); return(T_NUMBER);}
+"+"             { c(); return '+';}
+"-"             { c(); return '-';}
+"*"             { c(); return '*';}
+"/"             { c(); return '/';}
+"|"             { c(); return '|';}
+"&"             { c(); return '&';}
+"^"             { c(); return '^';}
+"~"             { c(); return '~';}
+"<<"            { c(); return T_LSHIFT;}
+">>"            { c(); return T_RSHIFT;}
 
 {S}{L}{L}       { c(); return T_SLL; }
 {S}{L}{R}       { c(); return T_SLR; }
@@ -84,23 +111,29 @@ int yywrap() {
   return 1;
 }
 
-static void comment() {
-    char ch;
-    while (1) {
-        ch = input();
-        if (ch == '\0') {
-            break;
-        }
-        if (ch == '*') {
-            ch = input();
-            if (ch == '\0') {
-                break;
-            }
-            if (ch == '/') {
-                break;
-            }
-        }
+static void comment_multiline() {
+  char ch;
+  while (1) {
+    ch = input();
+    if (ch == '\0') {
+      break;
     }
+    if (ch == '*') {
+      ch = input();
+      if (ch == '\0') {
+        break;
+      }
+      if (ch == '/') {
+        break;
+      }
+    }
+  }
+}
+
+static void comment_single() {
+  for (char ch = input();
+       (ch != '\0') && (ch != '\n');
+       ch = input());
 }
 
 static void c() {
@@ -119,9 +152,24 @@ static void c() {
     }
 }
 
-/* int main() { */
-/*     for (int r = yylex(); r != YYEOF; r = yylex()) { */
-/*         fprintf(stderr, "r = %i %s\n", r, yytext); */
-/*     } */
-/*     return 0; */
-/* } */
+static YYSTYPE conv_integer(const char* s, int base) {
+  long r = strtol(s, NULL, base);
+  if (errno == EINVAL) {
+    die("Failed to parse integer string: %s", yytext);
+  } else if (errno == ERANGE) {
+    die("Out of integer range: %s", yytext);
+  }
+  if (r < 0) {
+    die("Somehow lexer encountered a negative value: %ld", r);
+  }
+  return (YYSTYPE)r;
+}
+
+#if 0
+int main() {
+    for (int r = yylex(); r != YYEOF; r = yylex()) {
+        fprintf(stderr, "r = %i %s\n", r, yytext);
+    }
+    return 0;
+}
+#endif

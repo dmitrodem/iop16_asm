@@ -6,6 +6,8 @@
 #include "iop16_state.h"
 #include "die.h"
 
+#define CHUNKSIZE 128
+
 extern int yydebug;
 extern int yyparse();
 extern void yyrestart(FILE* fd);
@@ -35,6 +37,8 @@ void help() {
 }
 
 int main(int argc, char **argv) {
+
+  int r;
 
   progname = malloc(strlen(argv[0])+1);
   if (progname == NULL) {
@@ -78,7 +82,77 @@ int main(int argc, char **argv) {
 
   yydebug = 0;
 
-  if ((state.input = fopen(infile, "r")) == NULL) {
+  struct {
+    int rfd;
+    int wfd;
+  } p;
+
+  r = pipe((void *)&p);
+  if (r != 0) {
+    die("Failed to create pipe");
+  }
+
+  r = fork();
+
+  if (r < 0) {
+    die("Failed to fork child process");
+  }
+
+  if (r == 0) {
+    /* child process -- set up pipe and excecute C preprocessor */
+    if (close(p.rfd) != 0) {
+      die("Failed to close read end of pipe");
+    }
+    if (close(STDOUT_FILENO) != 0) {
+      die("Failed to close stdout");
+    }
+    if (dup2(p.wfd, STDOUT_FILENO) == -1) {
+      die("dup2() failed");
+    }
+    FILE *fp = fopen(infile, "r");
+    if (fp == NULL) {
+      die("Failed to open file: %s", infile);
+    }
+    if (close(STDIN_FILENO) != 0) {
+      die("Failed to close stdin");
+    }
+    if (dup2(fileno(fp), STDIN_FILENO) == -1) {
+      die("dup2() failed");
+    }
+    char *const preprocessor[] = {"gcc", "-E", "-", NULL};
+    if (execvp(preprocessor[0], preprocessor) == -1) {
+      die("Failed to execute preprocessor");
+    }
+  }
+
+  /* parent process -- read from pipe */
+  char *buf = NULL;
+  size_t buflen = 0;
+
+  do {
+    if (close(p.wfd) != 0) {
+      die("Failed to close write end of pipe");
+    }
+    FILE *memfp = open_memstream(&buf, &buflen);
+    if (memfp == NULL) {
+      die("Failed to open_memstream()");
+    }
+    char tmpbuf[CHUNKSIZE];
+    for(;;) {
+      ssize_t n = read(p.rfd, tmpbuf, CHUNKSIZE);
+      if (n == -1) {
+        die("Failed to read from pipe");
+      }
+      if (n == 0) {
+        break;
+      }
+      fwrite(tmpbuf, 1, n, memfp);
+    }
+    fclose(memfp);
+    close(p.rfd);
+  } while (0);
+
+  if ((state.input = fmemopen(buf, buflen, "r")) == NULL) {
     die("Failed to open input file: %s", infile);
   }
   if (outfile) {
@@ -119,6 +193,7 @@ int main(int argc, char **argv) {
 
   /* Finish -- close files, free labels table */
   state.init(&state, FINISH);
+  free(buf);
   free(progname);
 
   return EXIT_SUCCESS;

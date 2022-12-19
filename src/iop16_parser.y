@@ -12,7 +12,11 @@ extern FILE* yyin;
 void yyerror(const char* s);
 %}
 
-%token T_COLON T_COMMA T_LPAREN T_RPAREN T_SHARP
+%define api.value.type {uint8_t}
+
+%token T_COLON T_COMMA T_LPAREN T_RPAREN
+%token T_NUMBER
+%token T_LSHIFT T_RSHIFT
 %token T_BTARGET T_IMM T_REG
 %token T_SLL T_SLR T_SAL T_SAR T_RRL T_RRR
 %token T_RTS
@@ -21,9 +25,71 @@ void yyerror(const char* s);
 %token T_XRI T_ORI T_ARI T_ADI
 %token T_JSR T_JMP T_BEZ T_BNZ
 
+
+%left T_LSHIFT T_RSHIFT
+%left '&' '|' '^'
+%left '+' '-'
+%left '*' '/'
+%left '~'
+%left T_UMINUS
+
 %start program_body
 
 %%
+expression:     T_NUMBER
+                {
+                    $$ = $1;
+                } |
+                expression '+' expression
+                {
+                    $$ = $1 + $3;
+                } |
+                expression '-' expression
+                {
+                    $$ = $1 - $3;
+                } |
+                expression '*' expression
+                {
+                    $$ = $1 * $3;
+                } |
+                expression '/' expression
+                {
+                    $$ = $1 / $3;
+                } |
+                expression '|' expression
+                {
+                    $$ = $1 | $3;
+                } |
+                expression '&' expression
+                {
+                    $$ = $1 & $3;
+                } |
+                expression '^' expression
+                {
+                    $$ = $1 ^ $3;
+                } |
+                expression T_LSHIFT expression
+                {
+                    $$ = $1 << $3;
+                } |
+                expression T_RSHIFT expression
+                {
+                    $$ = $1 >> $3;
+                } |
+                '~' expression
+                {
+                    $$ = ~$2;
+                } |
+                '-' expression %prec T_UMINUS
+                {
+                    $$ = -$2;
+                } |
+                T_LPAREN expression T_RPAREN
+                {
+                    $$ = $2;
+                }
+        ;
+
 program_body:   instr_line |
                 program_body instr_line
         ;
@@ -136,91 +202,91 @@ rts_instruction:
 
         ;
 lri_instruction:
-                T_LRI reg T_COMMA imm
+                T_LRI reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_LRI << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
 cmp_instruction:
-                T_CMP reg T_COMMA imm
+                T_CMP reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_CMP << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
 iow_instruction:
-                T_IOW reg T_COMMA imm
+                T_IOW reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_IOW << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
 ior_instruction:
-                T_IOR reg T_COMMA imm
+                T_IOR reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_IOR << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
 xri_instruction:
-                T_XRI reg T_COMMA imm
+                T_XRI reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_XRI << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
 
         ;
 ori_instruction:
-                T_ORI reg T_COMMA imm
+                T_ORI reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_ORI << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
 ari_instruction:
-                T_ARI reg T_COMMA imm
+                T_ARI reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_ARI << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
 adi_instruction:
-                T_ADI reg T_COMMA imm
+                T_ADI reg T_COMMA expression
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_ADI << 12) |
                                           ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) state.imm) & 0xff));
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
@@ -269,11 +335,6 @@ reg:            T_REG
                     $$ = state.reg;
                 }
         ;
-imm:            T_SHARP T_IMM
-                {
-                    $$ = state.imm;
-                }
-        ;
 blabel:         T_BTARGET
                 {
                     strncpy(state.label, yytext, MAX_LABEL_LENGTH-1);
@@ -298,3 +359,13 @@ void yyerror(const char *s) {
                state.column,
                s);
 }
+
+#if 0
+int main() {
+    yyin = stdin;
+    yydebug = 0;
+    int r = yyparse();
+    printf("result = %ld\n", r);
+    return r;
+}
+#endif

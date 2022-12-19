@@ -47,7 +47,8 @@ static void init(struct iop16_state_t *self, enum pass_t pass) {
 }
 
 static void append_instruction(struct iop16_state_t *self, uint16_t inst) {
-  fprintf(self->output, "%03lx: %04x\n", self->pc, inst);
+  /* fprintf(self->output, "%03lx: %04x\n", self->pc, inst); */
+  fprintf(self->output, "x\"%04x\" when address = x\"%03lx\" else\n", inst, self->pc);
 }
 
 void iop16_append_label() {
