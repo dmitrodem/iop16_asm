@@ -1,8 +1,10 @@
 %{
 #include <stdio.h>
 #include <string.h>
+#include "die.h"
 #include "iop16_state.h"
 
+extern int yylineno;
 extern char *yytext;
 extern int yylex();
 extern int yyparse();
@@ -10,9 +12,20 @@ extern void yyrestart(FILE* fd);
 extern FILE* yyin;
 
 void yyerror(const char* s);
+static void chkreg(unsigned int v);
+static void chkimm(unsigned int v);
+static void chkaddr(unsigned int v);
+
+#ifdef TEST_PARSER
+#define dbg(...) {printf(__VA_ARGS__);}
+#else
+#define dbg(...) {}
+#endif
+
+#define YYERROR_VERBOSE 1
 %}
 
-%define api.value.type {uint8_t}
+%define api.value.type {unsigned int}
 
 %token T_COLON T_COMMA T_LPAREN T_RPAREN
 %token T_NUMBER
@@ -39,54 +52,67 @@ void yyerror(const char* s);
 expression:     T_NUMBER
                 {
                     $$ = $1;
+                    dbg("T_NUMBER: %i\n", $$);
                 } |
                 expression '+' expression
                 {
                     $$ = $1 + $3;
+                    dbg("T_PLUS: %i + %i = %i\n", $1, $3, $$);
                 } |
                 expression '-' expression
                 {
                     $$ = $1 - $3;
+                    dbg("T_MINUS: %i - %i = %i\n", $1, $3, $$);
                 } |
                 expression '*' expression
                 {
                     $$ = $1 * $3;
+                    dbg("T_MUL: %i * %i = %i\n", $1, $3, $$);
                 } |
                 expression '/' expression
                 {
                     $$ = $1 / $3;
+                    dbg("T_DIV: %i / %i = %i\n", $1, $3, $$);
                 } |
                 expression '|' expression
                 {
                     $$ = $1 | $3;
+                    dbg("T_OR: %i | %i = %i\n", $1, $3, $$);
                 } |
                 expression '&' expression
                 {
                     $$ = $1 & $3;
+                    dbg("T_AND: %i & %i = %i\n", $1, $3, $$);
                 } |
                 expression '^' expression
                 {
                     $$ = $1 ^ $3;
+                    dbg("T_XOR: %i ^ %i = %i\n", $1, $3, $$);
                 } |
                 expression T_LSHIFT expression
                 {
                     $$ = $1 << $3;
+                    dbg("T_LSHIFT: %i << %i = %i\n", $1, $3, $$);
                 } |
                 expression T_RSHIFT expression
                 {
                     $$ = $1 >> $3;
+                    dbg("T_RSHIFT: %i >> %i = %i\n", $1, $3, $$);
                 } |
                 '~' expression
                 {
                     $$ = ~$2;
+                    dbg("T_NOT: ~%i = %i\n", $2, $$);
                 } |
                 '-' expression %prec T_UMINUS
                 {
                     $$ = -$2;
+                    dbg("T_UMINUS: -%i = %i\n", $2, $$);
                 } |
                 T_LPAREN expression T_RPAREN
                 {
                     $$ = $2;
+                    dbg("T_PAREN: (%i) = %i\n", $2, $$);
                 }
         ;
 
@@ -104,6 +130,7 @@ instr_line:     blabel T_COLON instr
                     state.pc += 1;
                 }
         ;
+
 instr:          sll_instruction |
                 slr_instruction |
                 sal_instruction |
@@ -202,7 +229,7 @@ rts_instruction:
 
         ;
 lri_instruction:
-                T_LRI reg T_COMMA expression
+                T_LRI reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -213,7 +240,7 @@ lri_instruction:
                 }
         ;
 cmp_instruction:
-                T_CMP reg T_COMMA expression
+                T_CMP reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -224,7 +251,7 @@ cmp_instruction:
                 }
         ;
 iow_instruction:
-                T_IOW reg T_COMMA expression
+                T_IOW reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -235,7 +262,7 @@ iow_instruction:
                 }
         ;
 ior_instruction:
-                T_IOR reg T_COMMA expression
+                T_IOR reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -246,7 +273,7 @@ ior_instruction:
                 }
         ;
 xri_instruction:
-                T_XRI reg T_COMMA expression
+                T_XRI reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -258,7 +285,7 @@ xri_instruction:
 
         ;
 ori_instruction:
-                T_ORI reg T_COMMA expression
+                T_ORI reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -269,7 +296,7 @@ ori_instruction:
                 }
         ;
 ari_instruction:
-                T_ARI reg T_COMMA expression
+                T_ARI reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -280,7 +307,7 @@ ari_instruction:
                 }
         ;
 adi_instruction:
-                T_ADI reg T_COMMA expression
+                T_ADI reg T_COMMA imm
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
@@ -333,6 +360,13 @@ bnz_instruction:
 reg:            T_REG
                 {
                     $$ = state.reg;
+                    chkreg($$);
+                }
+        ;
+imm:            expression
+                {
+                    $$ = $1;
+                    chkimm($$);
                 }
         ;
 blabel:         T_BTARGET
@@ -345,22 +379,66 @@ btarget:        T_BTARGET
                 {
                     if (state.pass == PASS2) {
                         state.target_address = iop16_get_label_address(yytext);
+                        chkaddr(state.target_address);
                     }
                 }
         ;
 %%
 
 void yyerror(const char *s) {
-        fflush(stdout);
-        printf("\n%s\n", s);
-        printf("\n%*s\n%*s\n",
-               state.column,
-               "^",
-               state.column,
-               s);
+    fprintf(stderr,"error: %s in line %d\n", s, yylineno);
+
+    if (ftell(yyin) != -1) {
+        fseek(yyin, 0, SEEK_SET);
+        char ch;
+        ssize_t lineno = 1;
+        char errline[MAX_LINE];
+        for (;!feof(yyin);) {
+            if (lineno == yylineno) {
+                fgets(errline, MAX_LINE, yyin);
+                size_t errline_len = strlen(errline);
+                if (errline[errline_len-1] == '\n') {
+                    errline[errline_len-1] = '\0';
+                }
+                fputs(errline, stderr);
+                fputc('\n', stderr);
+                for (size_t i = 0; i < state.column; i++) {
+                    fputc(' ', stderr);
+                }
+                fputs("^\n", stderr);
+                break;
+            }
+            for (ch = fgetc(yyin);
+                 !feof(yyin);
+                 ch = fgetc(yyin)) {
+                if (ch == '\n') {
+                    lineno += 1;
+                    break;
+                }
+            }
+        }
+    }
 }
 
-#if 0
+static void chkreg(unsigned int v) {
+    if ((v >> 4) != 0) {
+        die("Register does not fit 8 bits");
+    }
+}
+
+static void chkimm(unsigned int v) {
+    if ((v >> 8) != 0) {
+        die("Immediate does not fit 8 bits");
+    }
+}
+
+static void chkaddr(unsigned int v) {
+    if ((v >> 12) != 0) {
+        die("Address does not fit 12 bits");
+    }
+}
+
+#if TEST_PARSER
 int main() {
     yyin = stdin;
     yydebug = 0;

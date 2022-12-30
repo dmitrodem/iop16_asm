@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <unistd.h>
 #include <string.h>
 #include "iop16_state.h"
@@ -22,19 +23,24 @@ struct help_entry_t {
 };
 
 static const struct help_entry_t help_entries[] = {
-  {"-h",         "Display this help"},
-  {"-o OUTFILE", "Output file name"},
-  {"-l LABELS",  "Generate list of labels"},
-  {NULL, NULL}
+  {"-h"             , "Display this help"},
+  {"-o OUTFILE"     , "Output file name"},
+  {"-l LABELS"      , "Generate list of labels"},
+  {"-f [c|rom|hex]" , "Output format"},
+  {"-b BASENAME"    , "Base name for C and ROM outputs"},
+  {NULL             , NULL}
 };
 
 void help() {
-  fprintf(stdout, "Usage: %s [OPTIONS] INFILE\n", progname);
+  fprintf(stdout, "Usage: %s [OPTIONS] [INFILE]\n", progname);
   for (const struct help_entry_t *e = help_entries; e->option; e++) {
     fprintf(stdout, "%-20s %s\n",
             e->option, e->description);
   }
 }
+
+#ifndef TEST_LEXER
+#ifndef TEST_PARSER
 
 int main(int argc, char **argv) {
 
@@ -49,8 +55,10 @@ int main(int argc, char **argv) {
   char *infile = NULL;
   char *outfile = NULL;
   char *labelsfile = NULL;
+  char *basename = "rom";
+  enum output_fmt_t fmt = FMT_UNK;
   int opt;
-  while((opt = getopt(argc, argv, "ho:l:")) != -1) {
+  while((opt = getopt(argc, argv, "ho:l:f:b:")) != -1) {
     switch (opt) {
     case 'h':
       help();
@@ -61,6 +69,14 @@ int main(int argc, char **argv) {
       break;
     case 'l':
       labelsfile = optarg;
+      break;
+    case 'f':
+      if      (strcasecmp(optarg, "c")   == 0) {fmt = FMT_C;  }
+      else if (strcasecmp(optarg, "rom") == 0) {fmt = FMT_ROM;}
+      else if (strcasecmp(optarg, "hex") == 0) {fmt = FMT_HEX;}
+      break;
+    case 'b':
+      basename = optarg;
       break;
     case '?':
     default:
@@ -76,7 +92,7 @@ int main(int argc, char **argv) {
     ninputs += 1;
   }
 
-  if (ninputs != 1) {
+  if (ninputs > 1) {
     die("Invalid number of input files: %ld", ninputs);
   }
 
@@ -109,17 +125,20 @@ int main(int argc, char **argv) {
     if (dup2(p.wfd, STDOUT_FILENO) == -1) {
       die("dup2() failed");
     }
-    FILE *fp = fopen(infile, "r");
-    if (fp == NULL) {
-      die("Failed to open file: %s", infile);
+    /* non-null infile -- replace STDIN */
+    if (infile != NULL) {
+      FILE *fp = fopen(infile, "r");
+      if (fp == NULL) {
+        die("Failed to open file: %s", infile);
+      }
+      if (close(STDIN_FILENO) != 0) {
+        die("Failed to close stdin");
+      }
+      if (dup2(fileno(fp), STDIN_FILENO) == -1) {
+        die("dup2() failed");
+      }
     }
-    if (close(STDIN_FILENO) != 0) {
-      die("Failed to close stdin");
-    }
-    if (dup2(fileno(fp), STDIN_FILENO) == -1) {
-      die("dup2() failed");
-    }
-    char *const preprocessor[] = {"gcc", "-E", "-", NULL};
+    char *const preprocessor[] = {"gcc", "-E", "-C", "-", NULL};
     if (execvp(preprocessor[0], preprocessor) == -1) {
       die("Failed to execute preprocessor");
     }
@@ -163,6 +182,9 @@ int main(int argc, char **argv) {
     state.output = stdout;
   }
 
+  state.fmt = fmt;
+  state.basename = basename;
+
   yyin = state.input;
 
   /* Pass 1 -- map labels to addresses */
@@ -198,3 +220,5 @@ int main(int argc, char **argv) {
 
   return EXIT_SUCCESS;
 }
+#endif
+#endif

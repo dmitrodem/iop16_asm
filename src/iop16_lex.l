@@ -11,7 +11,7 @@ static void comment_single();
 static void c();
 static YYSTYPE conv_integer();
 %}
-
+%option noyywrap nounput yylineno
 
 ws	[ \t\n]
 reg	[\$rR]
@@ -52,12 +52,12 @@ Y	[yY]
 Z	[zZ]
 
 %%
-"/*"		{ comment_multiline(); }
-"//"            { comment_single();    }
-"#"             { comment_single();    }
-";;"            { comment_single();    }
-"!"             { comment_single();    }
-{ws}+		;
+"/*"		{ c(); comment_multiline(); }
+"//"            { c(); comment_single();    }
+"#"             { c(); comment_single();    }
+";;"            { c(); comment_single();    }
+"!"             { c(); comment_single();    }
+[ \t]+		{ c(); }
 ","		{ c(); return T_COMMA; }
 {reg}{hdigit}   { c(); state.reg = strtol(yytext + 1, NULL, 16); return(T_REG); }
 "("             { c(); return(T_LPAREN); }
@@ -68,6 +68,7 @@ Z	[zZ]
 0b[0-1]+        { c(); yylval = conv_integer(yytext + 2,  2); return(T_NUMBER);}
 0[0-7]+         { c(); yylval = conv_integer(yytext + 1,  8); return(T_NUMBER);}
 0x[0-9a-fA-F]+  { c(); yylval = conv_integer(yytext + 2, 16); return(T_NUMBER);}
+0               { c(); yylval = 0;                            return(T_NUMBER);}
 "+"             { c(); return '+';}
 "-"             { c(); return '-';}
 "*"             { c(); return '*';}
@@ -79,76 +80,99 @@ Z	[zZ]
 "<<"            { c(); return T_LSHIFT;}
 ">>"            { c(); return T_RSHIFT;}
 
-{S}{L}{L}       { c(); return T_SLL; }
-{S}{L}{R}       { c(); return T_SLR; }
-{S}{A}{L}       { c(); return T_SAL; }
-{S}{A}{R}       { c(); return T_SAR; }
-{R}{R}{L}       { c(); return T_RRL; }
-{R}{R}{R}       { c(); return T_RRR; }
+(?i:sll)        { c(); return T_SLL; }
+(?i:slr)        { c(); return T_SLR; }
+(?i:sal)        { c(); return T_SAL; }
+(?i:sar)        { c(); return T_SAR; }
+(?i:rrl)        { c(); return T_RRL; }
+(?i:rrr)        { c(); return T_RRR; }
 
-{R}{T}{S}       { c(); return T_RTS; }
+(?i:rts)        { c(); return T_RTS; }
 
-{L}{R}{I}       { c(); return T_LRI; }
-{C}{M}{P}       { c(); return T_CMP; }
+(?i:lri)        { c(); return T_LRI; }
+(?i:cmp)        { c(); return T_CMP; }
 
-{I}{O}{W}       { c(); return T_IOW; }
-{I}{O}{R}       { c(); return T_IOR; }
+(?i:iow)        { c(); return T_IOW; }
+(?i:ior)        { c(); return T_IOR; }
 
-{X}{R}{I}       { c(); return T_XRI; }
-{O}{R}{I}       { c(); return T_ORI; }
-{A}{R}{I}       { c(); return T_ARI; }
-{A}{D}{I}       { c(); return T_ADI; }
+(?i:xri)        { c(); return T_XRI; }
+(?i:ori)        { c(); return T_ORI; }
+(?i:ari)        { c(); return T_ARI; }
+(?i:adi)        { c(); return T_ADI; }
 
-{J}{S}{R}       { c(); return T_JSR; }
-{J}{M}{P}       { c(); return T_JMP; }
-{B}{E}{Z}       { c(); return T_BEZ; }
-{B}{N}{Z}       { c(); return T_BNZ; }
-{anum}		{ c(); return T_BTARGET; }
+(?i:(jsr)|(call)) { c(); return T_JSR; }
+(?i:(jmp))        { c(); return T_JMP; }
+(?i:(bez)|(beq))  { c(); return T_BEZ; }
+(?i:(bnz)|(bne))  { c(); return T_BNZ; }
 
+{anum}		  { c(); return T_BTARGET; }
+
+\n                { c(); }
+.                 { c(); }
 %%
 
-int yywrap() {
-  return 1;
+static void update_position(char ch) {
+    if (ch == '\n') {
+        state.cur_line[state.cur_ptr] = '\0';
+        strcpy(state.last_line, state.cur_line);
+        state.cur_ptr = 0;
+
+        state.column = 0;
+        state.line += 1;
+    } else {
+        if (state.cur_ptr < MAX_LINE-1) {
+            state.cur_line[state.cur_ptr] = ch;
+            state.cur_ptr += 1;
+        }
+        state.column += 1;
+    }
 }
 
 static void comment_multiline() {
-  char ch;
-  while (1) {
-    ch = input();
-    if (ch == '\0') {
-      break;
+    enum {IDLE, STAR} fsm = IDLE;
+    for (int ch = input();
+         (ch != EOF) && (ch != 0);
+         ch = input()) {
+        int finish = 0;
+
+        /* update position */
+        update_position((char)ch);
+
+        /* find end of comment */
+        switch (fsm) {
+        case IDLE:
+            if (ch == '*') {
+                fsm = STAR;
+            }
+            break;
+        case STAR:
+            if (ch == '/') {
+                finish = 1;
+            }
+            break;
+        default:
+            break;
+        }
+        if (finish == 1) {
+            break;
+        }
     }
-    if (ch == '*') {
-      ch = input();
-      if (ch == '\0') {
-        break;
-      }
-      if (ch == '/') {
-        break;
-      }
-    }
-  }
 }
 
 static void comment_single() {
-  for (char ch = input();
-       (ch != '\0') && (ch != '\n');
-       ch = input());
+  for (int ch = input();
+       (ch != EOF) && (ch != 0);
+       ch = input()) {
+      update_position((char)ch);
+      if (ch == '\n') {
+          break;
+      }
+  }
 }
 
 static void c() {
     for (char *ch = yytext; *ch != '\0'; ch++) {
-        switch (*ch) {
-        case '\n':
-            state.column = 0;
-            break;
-        case '\t':
-            state.column += 8 - (state.column % 8);
-            break;
-        default:
-            state.column += 1;
-            break;
-        }
+        update_position(*ch);
     }
 }
 
@@ -165,11 +189,20 @@ static YYSTYPE conv_integer(const char* s, int base) {
   return (YYSTYPE)r;
 }
 
-#if 0
+#ifdef TEST_LEXER
 int main() {
+    memset(state.cur_line, 0, MAX_LINE);
+    memset(state.last_line, 0, MAX_LINE);
+    state.line = 0; state.column = 0; state.cur_ptr = 0;
     for (int r = yylex(); r != YYEOF; r = yylex()) {
         fprintf(stderr, "r = %i %s\n", r, yytext);
     }
+
+    state.cur_line[state.cur_ptr] = '\0';
+    printf("line = %ld, column = %ld, cur_ptr = %ld\n",
+           state.line, state.column, state.cur_ptr);
+    printf("last_line = \"%s\"\n", state.last_line);
+    printf("cur_line = \"%s\"\n", state.cur_line);
     return 0;
 }
 #endif

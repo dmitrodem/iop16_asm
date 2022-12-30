@@ -27,7 +27,8 @@ exe = executable(
   lexfiles,
   parserfiles,
   include_directories: 'src',
-  install : true)
+  install : true,
+  c_args: ['-UTEST_LEXER', '-UTEST_PARSER'])
 
 test('Simple test',
      exe,

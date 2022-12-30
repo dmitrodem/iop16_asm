@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #define MAX_LABEL_LENGTH 32
+#define MAX_LINE 1024
 
 #define OP_OP0 0x0
 #define OP_OP1 0x1
@@ -36,11 +37,20 @@ enum pass_t {
   FINISH
 };
 
+enum output_fmt_t {
+  FMT_UNK,
+  FMT_C,
+  FMT_ROM,
+  FMT_HEX
+};
+
 struct iop16_state_t;
 struct iop16_state_t {
   int reg;
   int imm;
   size_t column;
+  size_t line;
+
   enum pass_t pass;
   size_t pc;
   char label[MAX_LABEL_LENGTH];
@@ -49,6 +59,13 @@ struct iop16_state_t {
 
   FILE* input;
   FILE* output;
+
+  enum output_fmt_t fmt;
+  const char *basename;
+  char cur_line[MAX_LINE];
+  size_t cur_ptr;
+  size_t cur_prev_ptr;
+  char last_line[MAX_LINE];
 
   void (*init)(struct iop16_state_t *self, enum pass_t pass);
   void (*append_inst)(struct iop16_state_t *self, uint16_t inst);

@@ -40,6 +40,20 @@ static void init(struct iop16_state_t *self, enum pass_t pass) {
       self->input = NULL;
     }
     if (self->output) {
+      switch (self->fmt) {
+      case FMT_C:
+        fprintf(self->output, "};\n");
+        fprintf(self->output, "const size_t %s_rom_len = sizeof(%s_rom)/sizeof(%s_rom[0]);\n",
+                state.basename, state.basename, state.basename);
+        break;
+      case FMT_HEX:
+        break;
+      case FMT_ROM:
+        fprintf(self->output, "x\"0000\";\n");
+        break;
+      default:
+        break;
+      }
       fclose(self->output);
       self->output = NULL;
     }
@@ -47,8 +61,28 @@ static void init(struct iop16_state_t *self, enum pass_t pass) {
 }
 
 static void append_instruction(struct iop16_state_t *self, uint16_t inst) {
-  /* fprintf(self->output, "%03lx: %04x\n", self->pc, inst); */
-  fprintf(self->output, "x\"%04x\" when address = x\"%03lx\" else\n", inst, self->pc);
+  switch (self->fmt) {
+  case FMT_C:
+    if (self->pc == 0) {
+      fprintf(self->output, "#include <stdint.h>\n");
+      fprintf(self->output, "#include <stddef.h>\n");
+      fprintf(self->output, "const uint16_t %s_rom[] = {\n",
+              state.basename);
+    }
+    fprintf(self->output, "/* 0x%03lx */ 0x%04x,\n",
+            self->pc, inst);
+    break;
+  case FMT_HEX:
+    fprintf(self->output, "%03lx: %04x\n", self->pc, inst);
+    break;
+  case FMT_ROM:
+    if (self->pc == 0) {
+      fprintf(self->output, "%s_rom <= \n", state.basename);
+    }
+    fprintf(self->output, "x\"%04x\" when address = x\"%03lx\" else\n", inst, self->pc);
+  default:
+    break;
+  }
 }
 
 void iop16_append_label() {
