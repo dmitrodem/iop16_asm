@@ -44,6 +44,12 @@ enum output_fmt_t {
   FMT_HEX
 };
 
+enum output_width_t {
+  WIDTH_UNK,
+  WIDTH_8,
+  WIDTH_16
+};
+
 struct iop16_state_t;
 struct iop16_state_t {
   int reg;
@@ -61,6 +67,8 @@ struct iop16_state_t {
   FILE* output;
 
   enum output_fmt_t fmt;
+  enum output_width_t width;
+
   const char *basename;
   char cur_line[MAX_LINE];
   size_t cur_ptr;

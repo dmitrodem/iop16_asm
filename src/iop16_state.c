@@ -66,11 +66,23 @@ static void append_instruction(struct iop16_state_t *self, uint16_t inst) {
     if (self->pc == 0) {
       fprintf(self->output, "#include <stdint.h>\n");
       fprintf(self->output, "#include <stddef.h>\n");
-      fprintf(self->output, "const uint16_t %s_rom[] = {\n",
-              state.basename);
+      if (self->width == WIDTH_16) {
+        fprintf(self->output, "const uint16_t %s_rom[] = {\n",
+                state.basename);
+      } else if (self->width == WIDTH_8) {
+        fprintf(self->output, "const uint8_t %s_rom[] = {\n",
+                state.basename);
+      }
     }
-    fprintf(self->output, "/* 0x%03lx */ 0x%04x,\n",
-            self->pc, inst);
+    if (self->width == WIDTH_16) {
+      fprintf(self->output, "/* 0x%03lx */ 0x%04x,\n",
+              self->pc, inst);
+    } else if (self->width == WIDTH_8) {
+      fprintf(self->output, "/* 0x%03lx */ 0x%02x, 0x%02x,\n",
+              self->pc,
+              (inst >> 8) & 0xff,
+              (inst >> 0) & 0xff);
+    }
     break;
   case FMT_HEX:
     fprintf(self->output, "%03lx: %04x\n", self->pc, inst);

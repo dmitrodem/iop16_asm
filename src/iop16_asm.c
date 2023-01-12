@@ -27,6 +27,7 @@ static const struct help_entry_t help_entries[] = {
   {"-o OUTFILE"     , "Output file name"},
   {"-l LABELS"      , "Generate list of labels"},
   {"-f [c|rom|hex]" , "Output format"},
+  {"-w [8|16]"      , "Field width (8 or 16 bits)"},
   {"-b BASENAME"    , "Base name for C and ROM outputs"},
   {NULL             , NULL}
 };
@@ -57,8 +58,9 @@ int main(int argc, char **argv) {
   char *labelsfile = NULL;
   char *basename = "rom";
   enum output_fmt_t fmt = FMT_UNK;
+  enum output_width_t width = WIDTH_16;
   int opt;
-  while((opt = getopt(argc, argv, "ho:l:f:b:")) != -1) {
+  while((opt = getopt(argc, argv, "ho:l:f:b:w:")) != -1) {
     switch (opt) {
     case 'h':
       help();
@@ -77,6 +79,10 @@ int main(int argc, char **argv) {
       break;
     case 'b':
       basename = optarg;
+      break;
+    case 'w':
+      if      (strcasecmp(optarg, "8")  == 0) {width = WIDTH_8;  }
+      else if (strcasecmp(optarg, "16") == 0) {width = WIDTH_16; }
       break;
     case '?':
     default:
@@ -183,6 +189,7 @@ int main(int argc, char **argv) {
   }
 
   state.fmt = fmt;
+  state.width = width;
   state.basename = basename;
 
   yyin = state.input;
