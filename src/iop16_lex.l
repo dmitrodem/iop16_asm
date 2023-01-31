@@ -80,12 +80,9 @@ Z	[zZ]
 "<<"            { c(); return T_LSHIFT;}
 ">>"            { c(); return T_RSHIFT;}
 
+
 (?i:sll)        { c(); return T_SLL; }
 (?i:slr)        { c(); return T_SLR; }
-(?i:sal)        { c(); return T_SAL; }
-(?i:sar)        { c(); return T_SAR; }
-(?i:rrl)        { c(); return T_RRL; }
-(?i:rrr)        { c(); return T_RRR; }
 
 (?i:rts)        { c(); return T_RTS; }
 

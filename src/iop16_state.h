@@ -12,7 +12,7 @@
 #define OP_OP2 0x2
 #define OP_OP3 0x3
 #define OP_LRI 0x4
-#define OP_CMP 0x5
+#define OP_RTS 0x5
 #define OP_IOR 0x6
 #define OP_IOW 0x7
 #define OP_XRI 0x8

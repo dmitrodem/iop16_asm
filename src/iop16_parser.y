@@ -13,7 +13,7 @@ extern FILE* yyin;
 
 void yyerror(const char* s);
 static void chkreg(unsigned int v);
-static void chkimm(unsigned int v);
+static void chkimm(unsigned int v, size_t n);
 static void chkaddr(unsigned int v);
 
 #ifdef TEST_PARSER
@@ -31,10 +31,11 @@ static void chkaddr(unsigned int v);
 %token T_NUMBER
 %token T_LSHIFT T_RSHIFT
 %token T_BTARGET T_IMM T_REG
-%token T_SLL T_SLR T_SAL T_SAR T_RRL T_RRR
+%token T_BCLR T_BSET
+%token T_SLL T_SLR
+%token T_LRI
 %token T_RTS
-%token T_LRI T_CMP
-%token T_IOW T_IOR
+%token T_IOR T_IOW
 %token T_XRI T_ORI T_ARI T_ADI
 %token T_JSR T_JMP T_BEZ T_BNZ
 
@@ -131,15 +132,13 @@ instr_line:     blabel T_COLON instr
                 }
         ;
 
-instr:          sll_instruction |
+instr:
+                bclr_instruction |
+                bset_instruction |
+                sll_instruction |
                 slr_instruction |
-                sal_instruction |
-                sar_instruction |
-                rrl_instruction |
-                rrr_instruction |
                 rts_instruction |
                 lri_instruction |
-                cmp_instruction |
                 iow_instruction |
                 ior_instruction |
                 xri_instruction |
@@ -151,69 +150,62 @@ instr:          sll_instruction |
                 bez_instruction |
                 bnz_instruction
         ;
+bclr_instruction:
+                T_BCLR imm3 T_COMMA imm3
+                {
+                    if (state.pass = PASS2) {
+                        state.append_inst(&state,
+                                          (OP_OP2 << 12) |
+                                          ((((uint16_t) ($4)) & 0x7) << 8) |
+                                          (((uint16_t) ($2)) & 0xff));
+
+                    }
+                }
+        ;
+bset_instruction:
+                T_BSET imm3 T_COMMA imm3
+                {
+                    if (state.pass = PASS2) {
+                        state.append_inst(&state,
+                                          (OP_OP2 << 12) |
+                                          (((((uint16_t) ($4)) & 0x7) | 0x8) << 8) |
+                                          (((uint16_t) ($2)) & 0xff));
+
+                    }
+                }
+        ;
 sll_instruction:
-                T_SLL reg
+                T_SLL reg T_COMMA reg T_COMMA imm3
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_OP3 << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (0x01));
+                                          (((uint16_t)($2) & 0xf) << 8) |
+                                          (((uint16_t)($4) & 0xf) << 4) |
+                                          ((uint16_t)($6) & 0x7));
                     }
                 }
         ;
 slr_instruction:
-                T_SLR reg
+                T_SLR reg T_COMMA reg T_COMMA imm3
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_OP3 << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (0x81));
+                                          (((uint16_t)($2) & 0xf) << 8) |
+                                          (((uint16_t)($4) & 0xf) << 4) |
+                                          (((uint16_t)($6) & 0x7) | 0x8));
                     }
                 }
         ;
-sal_instruction:
-                T_SAL reg
+lri_instruction:
+                T_LRI reg T_COMMA imm8
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
-                                          (OP_OP3 << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (0x21));
-                    }
-                }
-        ;
-sar_instruction:
-                T_SAR reg
-                {
-                    if (state.pass == PASS2) {
-                        state.append_inst(&state,
-                                          (OP_OP3 << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (0xa1));
-                    }
-                }
-        ;
-rrl_instruction:
-                T_RRL reg
-                {
-                    if (state.pass == PASS2) {
-                        state.append_inst(&state,
-                                          (OP_OP3 << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (0x41));
-                    }
-                }
-        ;
-rrr_instruction:
-                T_RRR reg
-                {
-                    if (state.pass == PASS2) {
-                        state.append_inst(&state,
-                                          (OP_OP3 << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (0xc1));
+                                          (OP_LRI << 12) |
+                                          ((((uint16_t) ($2)) & 0x0f) << 8) |
+                                          (((uint16_t) ($4)) & 0xff));
                     }
                 }
         ;
@@ -222,98 +214,78 @@ rts_instruction:
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
-                                          (OP_OP3 << 12) |
-                                          (0x008));
+                                          (OP_RTS << 12));
                     }
                 }
 
         ;
-lri_instruction:
-                T_LRI reg T_COMMA imm
-                {
-                    if (state.pass == PASS2) {
-                        state.append_inst(&state,
-                                          (OP_LRI << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
-                    }
-                }
-        ;
-cmp_instruction:
-                T_CMP reg T_COMMA imm
-                {
-                    if (state.pass == PASS2) {
-                        state.append_inst(&state,
-                                          (OP_CMP << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
-                    }
-                }
-        ;
-iow_instruction:
-                T_IOW reg T_COMMA imm
-                {
-                    if (state.pass == PASS2) {
-                        state.append_inst(&state,
-                                          (OP_IOW << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
-                    }
-                }
-        ;
 ior_instruction:
-                T_IOR reg T_COMMA imm
+                T_IOR reg T_COMMA imm8
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_IOR << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
+                                          (((uint16_t)($2) & 0xf) << 8) |
+                                          ((uint16_t)($4) & 0xff));
+                    }
+                }
+        ;
+iow_instruction:
+                T_IOW reg T_COMMA imm8
+                {
+                    if (state.pass == PASS2) {
+                        state.append_inst(&state,
+                                          (OP_IOW << 12) |
+                                          (((uint16_t)($2) & 0xf) << 8) |
+                                          ((uint16_t)($4) & 0xff));
                     }
                 }
         ;
 xri_instruction:
-                T_XRI reg T_COMMA imm
+                T_XRI reg T_COMMA reg T_COMMA reg
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_XRI << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
+                                          ((((uint16_t) ($2)) & 0xf) << 8) |
+                                          ((((uint16_t) ($4)) & 0xf) << 4) |
+                                          ((((uint16_t) ($6)) & 0xf)));
                     }
                 }
-
         ;
 ori_instruction:
-                T_ORI reg T_COMMA imm
+                T_ORI reg T_COMMA reg T_COMMA reg
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_ORI << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
+                                          ((((uint16_t) ($2)) & 0xf) << 8) |
+                                          ((((uint16_t) ($4)) & 0xf) << 4) |
+                                          ((((uint16_t) ($6)) & 0xf)));
                     }
                 }
         ;
 ari_instruction:
-                T_ARI reg T_COMMA imm
+                T_ARI reg T_COMMA reg T_COMMA reg
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_ARI << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
+                                          ((((uint16_t) ($2)) & 0xf) << 8) |
+                                          ((((uint16_t) ($4)) & 0xf) << 4) |
+                                          ((((uint16_t) ($6)) & 0xf)));
                     }
                 }
         ;
 adi_instruction:
-                T_ADI reg T_COMMA imm
+                T_ADI reg T_COMMA reg T_COMMA reg
                 {
                     if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_ADI << 12) |
-                                          ((((uint16_t) state.reg) & 0x0f) << 8) |
-                                          (((uint16_t) ($4)) & 0xff));
+                                          ((((uint16_t) ($2)) & 0xf) << 8) |
+                                          ((((uint16_t) ($4)) & 0xf) << 4) |
+                                          ((((uint16_t) ($6)) & 0xf)));
                     }
                 }
         ;
@@ -363,10 +335,16 @@ reg:            T_REG
                     chkreg($$);
                 }
         ;
-imm:            expression
+imm3:           expression
                 {
                     $$ = $1;
-                    chkimm($$);
+                    chkimm($$, 3);
+                }
+        ;
+imm8:           expression
+                {
+                    $$ = $1;
+                    chkimm($$, 8);
                 }
         ;
 blabel:         T_BTARGET
@@ -426,9 +404,9 @@ static void chkreg(unsigned int v) {
     }
 }
 
-static void chkimm(unsigned int v) {
-    if ((v >> 8) != 0) {
-        die("Immediate does not fit 8 bits");
+static void chkimm(unsigned int v, size_t n) {
+    if ((v >> n) != 0) {
+        die("Immediate does not fit %i bits", n);
     }
 }
 
