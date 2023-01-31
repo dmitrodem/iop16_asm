@@ -41,7 +41,8 @@ enum output_fmt_t {
   FMT_UNK,
   FMT_C,
   FMT_ROM,
-  FMT_HEX
+  FMT_HEX,
+  FMT_RAW
 };
 
 enum output_width_t {

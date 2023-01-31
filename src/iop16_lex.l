@@ -80,17 +80,17 @@ Z	[zZ]
 "<<"            { c(); return T_LSHIFT;}
 ">>"            { c(); return T_RSHIFT;}
 
+(?i:bclr)       { c(); return T_BCLR; }
+(?i:bset)       { c(); return T_BSET; }
 
 (?i:sll)        { c(); return T_SLL; }
 (?i:slr)        { c(); return T_SLR; }
 
+(?i:lri)        { c(); return T_LRI; }
 (?i:rts)        { c(); return T_RTS; }
 
-(?i:lri)        { c(); return T_LRI; }
-(?i:cmp)        { c(); return T_CMP; }
-
-(?i:iow)        { c(); return T_IOW; }
 (?i:ior)        { c(); return T_IOR; }
+(?i:iow)        { c(); return T_IOW; }
 
 (?i:xri)        { c(); return T_XRI; }
 (?i:ori)        { c(); return T_ORI; }

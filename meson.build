@@ -30,6 +30,11 @@ exe = executable(
   install : true,
   c_args: ['-UTEST_LEXER', '-UTEST_PARSER'])
 
+test_exe = executable(
+  'iop16_test',
+  test_srcs,
+  include_directories: 'src')
+
 test('Simple test',
      exe,
      args: [meson.source_root() + '/tests/test.asm']

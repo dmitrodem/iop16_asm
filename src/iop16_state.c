@@ -51,6 +51,8 @@ static void init(struct iop16_state_t *self, enum pass_t pass) {
       case FMT_ROM:
         fprintf(self->output, "x\"0000\";\n");
         break;
+      case FMT_RAW:
+        break;
       default:
         break;
       }
@@ -92,6 +94,10 @@ static void append_instruction(struct iop16_state_t *self, uint16_t inst) {
       fprintf(self->output, "%s_rom <= \n", state.basename);
     }
     fprintf(self->output, "x\"%04x\" when address = x\"%03lx\" else\n", inst, self->pc);
+    break;
+  case FMT_RAW:
+    fwrite(&inst, sizeof(inst), 1, self->output);
+    break;
   default:
     break;
   }

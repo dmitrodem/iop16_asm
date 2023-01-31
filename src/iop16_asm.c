@@ -23,13 +23,13 @@ struct help_entry_t {
 };
 
 static const struct help_entry_t help_entries[] = {
-  {"-h"             , "Display this help"},
-  {"-o OUTFILE"     , "Output file name"},
-  {"-l LABELS"      , "Generate list of labels"},
-  {"-f [c|rom|hex]" , "Output format"},
-  {"-w [8|16]"      , "Field width (8 or 16 bits)"},
-  {"-b BASENAME"    , "Base name for C and ROM outputs"},
-  {NULL             , NULL}
+  {"-h"                 , "Display this help"},
+  {"-o OUTFILE"         , "Output file name"},
+  {"-l LABELS"          , "Generate list of labels"},
+  {"-f [c|rom|hex|raw]" , "Output format"},
+  {"-w [8|16]"          , "Field width (8 or 16 bits)"},
+  {"-b BASENAME"        , "Base name for C and ROM outputs"},
+  {NULL                 , NULL}
 };
 
 void help() {
@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
       if      (strcasecmp(optarg, "c")   == 0) {fmt = FMT_C;  }
       else if (strcasecmp(optarg, "rom") == 0) {fmt = FMT_ROM;}
       else if (strcasecmp(optarg, "hex") == 0) {fmt = FMT_HEX;}
+      else if (strcasecmp(optarg, "raw") == 0) {fmt = FMT_RAW;}
       break;
     case 'b':
       basename = optarg;
@@ -199,7 +200,6 @@ int main(int argc, char **argv) {
   if (yyparse() != 0) {
     die("Failed to parse input file");
   }
-  printf("number of instructions = %ld\n", state.pc);
   if (labelsfile) {
     FILE* labelsfd = fopen(labelsfile, "w");
     if (labelsfd == NULL) {

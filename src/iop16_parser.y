@@ -151,25 +151,25 @@ instr:
                 bnz_instruction
         ;
 bclr_instruction:
-                T_BCLR imm3 T_COMMA imm3
+                T_BCLR imm3 T_COMMA imm8
                 {
-                    if (state.pass = PASS2) {
+                    if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_OP2 << 12) |
-                                          ((((uint16_t) ($4)) & 0x7) << 8) |
-                                          (((uint16_t) ($2)) & 0xff));
+                                          ((((uint16_t) ($2)) & 0x7) << 8) |
+                                          (((uint16_t) ($4)) & 0xff));
 
                     }
                 }
         ;
 bset_instruction:
-                T_BSET imm3 T_COMMA imm3
+                T_BSET imm3 T_COMMA imm8
                 {
-                    if (state.pass = PASS2) {
+                    if (state.pass == PASS2) {
                         state.append_inst(&state,
                                           (OP_OP2 << 12) |
-                                          (((((uint16_t) ($4)) & 0x7) | 0x8) << 8) |
-                                          (((uint16_t) ($2)) & 0xff));
+                                          (((((uint16_t) ($2)) & 0x7) | 0x8) << 8) |
+                                          (((uint16_t) ($4)) & 0xff));
 
                     }
                 }
@@ -406,7 +406,7 @@ static void chkreg(unsigned int v) {
 
 static void chkimm(unsigned int v, size_t n) {
     if ((v >> n) != 0) {
-        die("Immediate does not fit %i bits", n);
+        die("Immediate does not fit %ld bits", n);
     }
 }
 
