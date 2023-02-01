@@ -19,6 +19,11 @@ parsergen = generator(
     '--debug'
   ])
 
+versionc = vcs_tag(
+  command: ['git', 'describe', '--dirty', '--always', '--tags'],
+  input: 'src/version.c.in',
+  output: 'version.c')
+
 subdir('src')
 
 exe = executable(
@@ -26,6 +31,7 @@ exe = executable(
   sources,
   lexfiles,
   parserfiles,
+  versionc,
   include_directories: 'src',
   install : true,
   c_args: ['-UTEST_LEXER', '-UTEST_PARSER'])

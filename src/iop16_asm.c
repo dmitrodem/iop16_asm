@@ -15,6 +15,8 @@ extern void yyrestart(FILE* fd);
 extern FILE* yyin;
 void yyerror(const char* s);
 
+extern const char iop16_version[];
+
 static char *progname;
 
 struct help_entry_t {
@@ -29,11 +31,12 @@ static const struct help_entry_t help_entries[] = {
   {"-f [c|rom|hex|raw]" , "Output format"},
   {"-w [8|16]"          , "Field width (8 or 16 bits)"},
   {"-b BASENAME"        , "Base name for C and ROM outputs"},
+  {"-v"                 , "Show version"},
   {NULL                 , NULL}
 };
 
 void help() {
-  fprintf(stdout, "Usage: %s [OPTIONS] [INFILE]\n", progname);
+  fprintf(stdout, "Usage: %s-%s [OPTIONS] [INFILE]\n", progname, iop16_version);
   for (const struct help_entry_t *e = help_entries; e->option; e++) {
     fprintf(stdout, "%-20s %s\n",
             e->option, e->description);
@@ -60,7 +63,7 @@ int main(int argc, char **argv) {
   enum output_fmt_t fmt = FMT_UNK;
   enum output_width_t width = WIDTH_16;
   int opt;
-  while((opt = getopt(argc, argv, "ho:l:f:b:w:")) != -1) {
+  while((opt = getopt(argc, argv, "ho:l:f:b:w:v")) != -1) {
     switch (opt) {
     case 'h':
       help();
@@ -84,6 +87,10 @@ int main(int argc, char **argv) {
     case 'w':
       if      (strcasecmp(optarg, "8")  == 0) {width = WIDTH_8;  }
       else if (strcasecmp(optarg, "16") == 0) {width = WIDTH_16; }
+      break;
+    case 'v':
+      printf("v%s\n", iop16_version);
+      exit(EXIT_SUCCESS);
       break;
     case '?':
     default:
