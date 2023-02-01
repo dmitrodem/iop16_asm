@@ -74,7 +74,7 @@ int handle_single_opcode_test(int fd, void *userdata) {
 int main() {
   uint16_t expected;
 
-  expected = 0x2507;
+  expected = 0x2506;
   runtest("BCLR test #1", "bclr 5, 0x07", handle_single_opcode_test, &expected);
 
   expected = 0x27cd;
