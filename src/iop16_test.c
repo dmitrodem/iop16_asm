@@ -66,7 +66,7 @@ int handle_single_opcode_test(int fd, void *userdata) {
   int ok = 1;
   for (size_t n = 0; read(fd, &opcode, sizeof(opcode)) > 0; n += 1) {
     ok = ok & (opcode == opcodes[n]);
-    /* printf("0x%04x\n", opcode); */
+    /* printf("%04x\n", opcode); */
   }
   return ok;
 }
@@ -95,11 +95,119 @@ int main() {
   expected = 0x3acf;
   runtest("SLR test #1", "slr rA, rC, 0x7", handle_single_opcode_test, &expected);
 
+  expected = 0x3048;
+  runtest("SLR test #2", "slr r0, r4, 0x0", handle_single_opcode_test, &expected);
+
   expected = 0x40ab;
   runtest("LRI test #1", "lri r0, 0xab", handle_single_opcode_test, &expected);
 
   expected = 0x46cd;
   runtest("LRI test #2", "lri r6, 0xcd", handle_single_opcode_test, &expected);
+
+  expected = 0x5000;
+  runtest("RTS test #1", "rts", handle_single_opcode_test, &expected);
+
+  expected = 0x66ab;
+  runtest("IOR test #1", "ior r6, 0xab", handle_single_opcode_test, &expected);
+
+  expected = 0x63ff;
+  runtest("IOR test #2", "ior r3, 0xff", handle_single_opcode_test, &expected);
+
+  expected = 0x7593;
+  runtest("IOW test #1", "iow r5, 0x93", handle_single_opcode_test, &expected);
+
+  expected = 0x7f00;
+  runtest("IOW test #2", "iow rF, 0x00", handle_single_opcode_test, &expected);
+
+  expected = 0x8abc;
+  runtest("XRI test #1", "xri rA, rB, rC", handle_single_opcode_test, &expected);
+
+  expected = 0x8abc;
+  runtest("XRI test #1", "xri rA, rB, rC", handle_single_opcode_test, &expected);
+
+  expected = 0x9123;
+  runtest("ORI test #1", "ori r1, r2, r3", handle_single_opcode_test, &expected);
+
+  expected = 0xa075;
+  runtest("ARI test #1", "ari r0, r7, r5", handle_single_opcode_test, &expected);
+
+  expected = 0xbcde;
+  runtest("ADI test #1", "adi rC, rD, rE", handle_single_opcode_test, &expected);
+
+  {
+    const char code[] =
+      "jsr subroutine\n"
+      "subroutine:\n"
+      "rts\n";
+    const uint16_t binary[] = {
+      0xc001, 0x5000
+    };
+    runtest("JSR test #1", code, handle_single_opcode_test, (void *)binary);
+  }
+
+  {
+    const char code[] =
+      "jmp label\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "label:\n"
+      "rts\n";
+    const uint16_t binary[] = {
+      0xd005,
+      0x4000, 0x4000, 0x4000, 0x4000,
+      0x5000
+    };
+    runtest("JMP test #1", code, handle_single_opcode_test, (void *)binary);
+  }
+
+  {
+    const char code[] =
+      "xri r8, r0, r1\n"
+      "bez label\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "label:\n"
+      "rts\n";
+    const uint16_t binary[] = {
+      0x8801,
+      0xe006,
+      0x4000, 0x4000, 0x4000, 0x4000,
+      0x5000
+    };
+    runtest("BEZ test #1", code, handle_single_opcode_test, (void *)binary);
+  }
+  {
+    const char code[] =
+      "xri r8, r0, r1\n"
+      "bnz label\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "lri r0, 0x00\n"
+      "label:\n"
+      "rts\n";
+    const uint16_t binary[] = {
+      0x8801,
+      0xf007,
+      0x4000, 0x4000, 0x4000, 0x4000, 0x4000,
+      0x5000
+    };
+    runtest("BNZ test #1", code, handle_single_opcode_test, (void *)binary);
+  }
+
+  expected = 0x3cd0;
+  runtest("MOV test #1", "mov rC, rD", handle_single_opcode_test, &expected);
+
+  expected = 0x3880;
+  runtest("NOP test #1", "nop", handle_single_opcode_test, &expected);
+
+  expected = 0x889d;
+  runtest("CMP test #1", "cmp r9, rD", handle_single_opcode_test, &expected);
 
   return EXIT_SUCCESS;
 }

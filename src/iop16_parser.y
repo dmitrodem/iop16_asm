@@ -38,6 +38,7 @@ static void chkaddr(unsigned int v);
 %token T_IOR T_IOW
 %token T_XRI T_ORI T_ARI T_ADI
 %token T_JSR T_JMP T_BEZ T_BNZ
+%token T_MOV T_NOP T_CMP
 
 
 %left T_LSHIFT T_RSHIFT
@@ -148,7 +149,10 @@ instr:
                 jsr_instruction |
                 jmp_instruction |
                 bez_instruction |
-                bnz_instruction
+                bnz_instruction |
+                mov_instruction |
+                nop_instruction |
+                cmp_instruction
         ;
 bclr_instruction:
                 T_BCLR imm3 T_COMMA imm8
@@ -326,6 +330,42 @@ bnz_instruction:
                         state.append_inst(&state,
                                           (OP_BNZ << 12) |
                                           (((uint16_t) state.target_address) & 0xfff));
+                    }
+                }
+        ;
+mov_instruction:
+                T_MOV reg T_COMMA reg
+                {
+                    /* mov Rd, Rs => sll Rd, Rs, 0x0 */
+                    if (state.pass == PASS2) {
+                        state.append_inst(&state,
+                                          (OP_OP3 << 12) |
+                                          (((uint16_t)($2) & 0xf) << 8) |
+                                          (((uint16_t)($4) & 0xf) << 4));
+                    }
+                }
+        ;
+nop_instruction:
+                T_NOP
+                {
+                    /* mov Rd, Rs => sll Rd, Rs, 0x0 */
+                    if (state.pass == PASS2) {
+                        state.append_inst(&state,
+                                          (OP_OP3 << 12) |
+                                          (((uint16_t)(0x8) & 0xf) << 8) |
+                                          (((uint16_t)(0x8) & 0xf) << 4));
+                    }
+                }
+        ;
+cmp_instruction:
+                T_CMP reg T_COMMA reg
+                {
+                    if (state.pass == PASS2) {
+                        state.append_inst(&state,
+                                          (OP_XRI << 12) |
+                                          ((((uint16_t) (0x8)) & 0xf) << 8) |
+                                          ((((uint16_t) ($2)) & 0xf) << 4) |
+                                          ((((uint16_t) ($4)) & 0xf)));
                     }
                 }
         ;

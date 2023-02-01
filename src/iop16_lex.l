@@ -102,6 +102,10 @@ Z	[zZ]
 (?i:(bez)|(beq))  { c(); return T_BEZ; }
 (?i:(bnz)|(bne))  { c(); return T_BNZ; }
 
+(?:mov)           { c(); return T_MOV; }
+(?:nop)           { c(); return T_NOP; }
+(?:cmp)           { c(); return T_CMP; }
+
 {anum}		  { c(); return T_BTARGET; }
 
 \n                { c(); }

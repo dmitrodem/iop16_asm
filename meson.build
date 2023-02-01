@@ -36,6 +36,4 @@ test_exe = executable(
   include_directories: 'src')
 
 test('Simple test',
-     exe,
-     args: [meson.source_root() + '/tests/test.asm']
-    )
+     test_exe)
